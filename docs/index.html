@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Librarian - Download</title>
+    <meta name="description" content="Download The Librarian - A mystical roguelike adventure through the depths of an ancient library">
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" type="image/x-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📚</text></svg>">
+</head>
+<body>
+    <header class="hero">
+        <div class="container">
+            <h1 class="game-title">📚 The Librarian</h1>
+            <p class="game-subtitle">A mystical roguelike adventure through the depths of an ancient library</p>
+            <div class="hero-actions">
+                <a href="#download" class="btn btn-primary">Download Now</a>
+                <a href="https://github.com/klp2/the-librarian-game" class="btn btn-secondary">View on GitHub</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="container">
+        <section id="download" class="download-section">
+            <h2>Download Latest Version</h2>
+            <div id="loading" class="loading">
+                <div class="spinner"></div>
+                <p>Loading latest release...</p>
+            </div>
+            <div id="error" class="error hidden">
+                <p>Error loading downloads. Please visit the <a href="https://github.com/klp2/the-librarian-game/releases">releases page</a> directly.</p>
+            </div>
+            <div id="downloads" class="downloads hidden">
+                <div id="release-info" class="release-info"></div>
+                <div id="platform-downloads" class="platform-grid"></div>
+                <div id="additional-files" class="additional-files"></div>
+            </div>
+        </section>
+
+        <section class="features-section">
+            <h2>Game Features</h2>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">🗺️</div>
+                    <h3>Procedural Dungeons</h3>
+                    <p>Every playthrough offers unique room layouts and challenging corridors to explore.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">⚔️</div>
+                    <h3>Tactical Combat</h3>
+                    <p>6 distinct weapon types with unique properties. Strategy beats reflexes.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">📖</div>
+                    <h3>Dynamic Stories</h3>
+                    <p>Equipment usage generates discoverable lore and evolving narratives.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">⭐</div>
+                    <h3>Equipment Mastery</h3>
+                    <p>Items become more familiar and effective through repeated use.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🔍</div>
+                    <h3>Item Assessment</h3>
+                    <p>Examine items to uncover hidden properties and rich backstories.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">💾</div>
+                    <h3>Save System</h3>
+                    <p>Continue your adventures across multiple sessions with reliable saves.</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="instructions-section">
+            <h2>How to Play</h2>
+            <div class="instructions-grid">
+                <div class="instruction-group">
+                    <h3>Movement</h3>
+                    <ul>
+                        <li><kbd>Arrow Keys</kbd> or <kbd>hjkl</kbd> - Move character</li>
+                        <li><kbd>Numpad 1-9</kbd> - Move in 8 directions</li>
+                    </ul>
+                </div>
+                <div class="instruction-group">
+                    <h3>Items</h3>
+                    <ul>
+                        <li><kbd>g</kbd> - Pick up items</li>
+                        <li><kbd>i</kbd> - Open inventory</li>
+                        <li><kbd>x</kbd> - Examine items</li>
+                        <li><kbd>u</kbd> - Use consumables</li>
+                    </ul>
+                </div>
+                <div class="instruction-group">
+                    <h3>Equipment</h3>
+                    <ul>
+                        <li><kbd>w</kbd> - Wield weapons</li>
+                        <li><kbd>W</kbd> - Wear armor</li>
+                        <li><kbd>r</kbd> - Remove equipment</li>
+                    </ul>
+                </div>
+                <div class="instruction-group">
+                    <h3>System</h3>
+                    <ul>
+                        <li><kbd>q</kbd> or <kbd>Escape</kbd> - Quit</li>
+                        <li><kbd>Enter</kbd> - Confirm selections</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <section class="requirements-section">
+            <h2>System Requirements</h2>
+            <div class="requirements-grid">
+                <div class="requirement-card">
+                    <h3>🪟 Windows</h3>
+                    <ul>
+                        <li>Windows 10 or later</li>
+                        <li>Terminal with Unicode support</li>
+                        <li>50MB RAM, 10MB storage</li>
+                    </ul>
+                </div>
+                <div class="requirement-card">
+                    <h3>🍎 macOS</h3>
+                    <ul>
+                        <li>macOS 10.14 or later</li>
+                        <li>Terminal.app or iTerm2</li>
+                        <li>Intel or Apple Silicon</li>
+                    </ul>
+                </div>
+                <div class="requirement-card">
+                    <h3>🐧 Linux</h3>
+                    <ul>
+                        <li>Any modern distribution</li>
+                        <li>Terminal emulator</li>
+                        <li>80x24 minimum terminal size</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 Kevin Phair. All rights reserved.</p>
+            <p>
+                <a href="https://github.com/klp2/the-librarian-game">GitHub</a> • 
+                <a href="https://github.com/klp2/the-librarian-game/discussions">Discussions</a> • 
+                <a href="https://github.com/klp2/the-librarian-game/releases">Releases</a>
+            </p>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
