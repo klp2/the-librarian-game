@@ -18,10 +18,16 @@
 
 - **Procedural Dungeon Generation**: Every playthrough offers unique room layouts and corridors
 - **Enhanced Combat System**: 6 distinct weapon types with tactical properties
+- **Character Progression**: Level up, gain skill points, and specialize in combat styles
+- **Skill System**: 12 skills across combat, defense, and utility categories
+- **Achievement System**: Track progress with 12+ achievements and earn rewards
+- **Status Effects**: Combat features poison, regeneration, buffs, and debuffs
+- **Enemy Scaling**: Dungeon difficulty increases as you delve deeper
 - **Equipment Mastery**: Items become more familiar through use (★/★★ progression)
 - **Dynamic Storytelling**: Equipment usage generates discoverable lore and narratives
 - **Item Assessment**: Examine items to uncover hidden properties and stories
 - **Player Inscriptions**: Add personal notes to equipment that persist across sessions
+- **Stealth Mechanics**: Reduce enemy detection range and gain ambush bonuses
 - **Turn-Based Strategy**: Tactical combat rewards planning over reflexes
 - **Line-of-Sight AI**: Intelligent enemies with realistic vision and behavior
 - **Save/Load System**: Continue your adventures across multiple sessions
@@ -33,6 +39,8 @@
 - **Arrow Keys** or **hjkl**: Move your character
 - **g**: Pick up items from the ground
 - **i**: Open inventory to manage items
+- **s**: View skills and spend skill points
+- **a**: View achievements and progress
 - **x**: Examine items (on ground or in inventory)
 - **u**: Use consumable items (potions, scrolls)
 - **w**: Wield weapons
