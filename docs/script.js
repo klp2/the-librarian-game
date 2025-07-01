@@ -216,37 +216,74 @@ class ChangelogCarousel {
 
 class ReleaseManager {
     constructor() {
-        this.apiUrl = 'https://api.github.com/repos/klp2/the-librarian-game/releases/latest';
+        this.baseDownloadUrl = 'https://github.com/klp2/the-librarian-game/raw/main/downloads/v0.5.1/';
         this.loadingEl = document.getElementById('loading');
         this.errorEl = document.getElementById('error');
         this.downloadsEl = document.getElementById('downloads');
         this.releaseInfoEl = document.getElementById('release-info');
         this.platformDownloadsEl = document.getElementById('platform-downloads');
         this.additionalFilesEl = document.getElementById('additional-files');
+        
+        // Static release data for v0.5.1
+        this.releaseData = {
+            tag_name: 'v0.5.1',
+            published_at: '2025-01-02T00:00:00Z',
+            prerelease: false,
+            assets: [
+                {
+                    name: 'the-librarian_Windows_x86_64.zip',
+                    browser_download_url: this.baseDownloadUrl + 'the-librarian_Windows_x86_64.zip',
+                    size: 5242880, // 5MB estimate
+                    download_count: 0
+                },
+                {
+                    name: 'the-librarian_Windows_arm64.zip',
+                    browser_download_url: this.baseDownloadUrl + 'the-librarian_Windows_arm64.zip',
+                    size: 5242880, // 5MB estimate
+                    download_count: 0
+                },
+                {
+                    name: 'the-librarian_Darwin_x86_64.tar.gz',
+                    browser_download_url: this.baseDownloadUrl + 'the-librarian_Darwin_x86_64.tar.gz',
+                    size: 4194304, // 4MB estimate
+                    download_count: 0
+                },
+                {
+                    name: 'the-librarian_Darwin_arm64.tar.gz',
+                    browser_download_url: this.baseDownloadUrl + 'the-librarian_Darwin_arm64.tar.gz',
+                    size: 4194304, // 4MB estimate
+                    download_count: 0
+                },
+                {
+                    name: 'the-librarian_Linux_x86_64.tar.gz',
+                    browser_download_url: this.baseDownloadUrl + 'the-librarian_Linux_x86_64.tar.gz',
+                    size: 4194304, // 4MB estimate
+                    download_count: 0
+                },
+                {
+                    name: 'the-librarian_Linux_arm64.tar.gz',
+                    browser_download_url: this.baseDownloadUrl + 'the-librarian_Linux_arm64.tar.gz',
+                    size: 4194304, // 4MB estimate
+                    download_count: 0
+                },
+                {
+                    name: 'checksums.txt',
+                    browser_download_url: this.baseDownloadUrl + 'checksums.txt',
+                    size: 1024, // 1KB estimate
+                    download_count: 0
+                }
+            ]
+        };
     }
 
     async init() {
         try {
-            await this.fetchLatestRelease();
+            // Simulate a small delay for UI consistency
+            await new Promise(resolve => setTimeout(resolve, 500));
+            this.displayRelease(this.releaseData);
         } catch (error) {
             console.error('Error initializing release manager:', error);
             this.showError();
-        }
-    }
-
-    async fetchLatestRelease() {
-        try {
-            const response = await fetch(this.apiUrl);
-            
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-            
-            const release = await response.json();
-            this.displayRelease(release);
-        } catch (error) {
-            console.error('Error fetching release:', error);
-            throw error;
         }
     }
 
@@ -265,7 +302,7 @@ class ReleaseManager {
         this.releaseInfoEl.innerHTML = `
             <h3>Version ${release.tag_name}${isPrerelease}</h3>
             <p><strong>Released:</strong> ${releaseDate}</p>
-            <p><strong>Downloads:</strong> ${this.getTotalDownloads(release)} total</p>
+            <p><strong>Available for:</strong> Windows, macOS, and Linux</p>
         `;
     }
 
@@ -368,8 +405,8 @@ class ReleaseManager {
         
         html += `
             <p>
-                <a href="https://github.com/klp2/the-librarian-game/releases/tag/${release.tag_name}" class="checksums-link">
-                    📜 View full release notes on GitHub
+                <a href="https://github.com/klp2/the-librarian-game/releases" class="checksums-link">
+                    📜 View all releases on GitHub
                 </a>
             </p>
         `;
