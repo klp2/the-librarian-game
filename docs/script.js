@@ -1,5 +1,219 @@
 // The Librarian - Download Page JavaScript
 
+// Changelog Carousel Data
+const changelogData = [
+    {
+        version: "v0.5.1",
+        title: "Critical Win Condition Fix",
+        highlights: [
+            "Fixed game completion detection ensuring victory works properly",
+            "Under-the-hood improvements for better stability",
+            "Enhanced game state management for reliable progression"
+        ],
+        cta: "Experience the complete victory flow!"
+    },
+    {
+        version: "v0.5.0",
+        title: "Enhanced Graphics System",
+        highlights: [
+            "Beautiful ASCII colors with terminal compatibility",
+            "Runtime graphics toggle for visual preference",
+            "Progressive enhancement with automatic fallback",
+            "93.3% test coverage for maximum reliability"
+        ],
+        cta: "Test the enhanced visual experience!"
+    }
+];
+
+// Changelog Carousel Class
+class ChangelogCarousel {
+    constructor() {
+        this.currentSlide = 0;
+        this.slides = changelogData;
+        this.autoAdvanceInterval = null;
+        this.autoAdvanceDelay = 10000; // 10 seconds
+        this.isPaused = false;
+        
+        this.trackEl = document.getElementById('carousel-track');
+        this.dotsEl = document.getElementById('carousel-dots');
+        this.prevBtn = document.getElementById('prev-btn');
+        this.nextBtn = document.getElementById('next-btn');
+        this.containerEl = document.querySelector('.carousel-container');
+    }
+
+    init() {
+        this.createSlides();
+        this.createDots();
+        this.bindEvents();
+        this.startAutoAdvance();
+        this.updateDisplay();
+    }
+
+    createSlides() {
+        this.trackEl.innerHTML = '';
+        
+        this.slides.forEach((slide, index) => {
+            const slideEl = document.createElement('div');
+            slideEl.className = 'changelog-slide';
+            slideEl.id = `slide-${index}`;
+            slideEl.setAttribute('role', 'tabpanel');
+            slideEl.setAttribute('aria-label', `${slide.version}: ${slide.title}`);
+            slideEl.innerHTML = `
+                <div class="changelog-content">
+                    <div class="changelog-version">${slide.version}</div>
+                    <div class="changelog-title">${slide.title}</div>
+                    <ul class="changelog-highlights">
+                        ${slide.highlights.map(highlight => `<li>${highlight}</li>`).join('')}
+                    </ul>
+                    <div class="changelog-cta">
+                        <a href="#download" class="changelog-link">${slide.cta}</a>
+                    </div>
+                </div>
+            `;
+            this.trackEl.appendChild(slideEl);
+        });
+    }
+
+    createDots() {
+        this.dotsEl.innerHTML = '';
+        
+        this.slides.forEach((slide, index) => {
+            const dot = document.createElement('button');
+            dot.className = 'carousel-dot';
+            dot.setAttribute('role', 'tab');
+            dot.setAttribute('aria-label', `${slide.version}: ${slide.title}`);
+            dot.setAttribute('aria-controls', `slide-${index}`);
+            dot.addEventListener('click', () => this.goToSlide(index));
+            this.dotsEl.appendChild(dot);
+        });
+    }
+
+    bindEvents() {
+        this.prevBtn.addEventListener('click', () => this.previousSlide());
+        this.nextBtn.addEventListener('click', () => this.nextSlide());
+        
+        // Pause on hover
+        this.containerEl.addEventListener('mouseenter', () => this.pauseAutoAdvance());
+        this.containerEl.addEventListener('mouseleave', () => this.resumeAutoAdvance());
+        
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (this.isCarouselFocused()) {
+                if (e.key === 'ArrowLeft') {
+                    e.preventDefault();
+                    this.previousSlide();
+                } else if (e.key === 'ArrowRight') {
+                    e.preventDefault();
+                    this.nextSlide();
+                }
+            }
+        });
+
+        // Touch/swipe support for mobile
+        this.touchStartX = 0;
+        this.touchEndX = 0;
+        
+        this.containerEl.addEventListener('touchstart', (e) => {
+            this.touchStartX = e.changedTouches[0].screenX;
+            this.pauseAutoAdvance();
+        });
+        
+        this.containerEl.addEventListener('touchend', (e) => {
+            this.touchEndX = e.changedTouches[0].screenX;
+            this.handleSwipe();
+            this.resumeAutoAdvance();
+        });
+    }
+
+    handleSwipe() {
+        const swipeThreshold = 50;
+        const swipeDistance = this.touchEndX - this.touchStartX;
+        
+        if (Math.abs(swipeDistance) > swipeThreshold) {
+            if (swipeDistance > 0) {
+                this.previousSlide();
+            } else {
+                this.nextSlide();
+            }
+        }
+    }
+
+    isCarouselFocused() {
+        return this.containerEl.contains(document.activeElement);
+    }
+
+    goToSlide(index) {
+        this.currentSlide = index;
+        this.updateDisplay();
+        this.restartAutoAdvance();
+    }
+
+    nextSlide() {
+        this.currentSlide = (this.currentSlide + 1) % this.slides.length;
+        this.updateDisplay();
+        this.restartAutoAdvance();
+    }
+
+    previousSlide() {
+        this.currentSlide = (this.currentSlide - 1 + this.slides.length) % this.slides.length;
+        this.updateDisplay();
+        this.restartAutoAdvance();
+    }
+
+    updateDisplay() {
+        // Update slide position
+        const translateX = -this.currentSlide * 100;
+        this.trackEl.style.transform = `translateX(${translateX}%)`;
+        
+        // Update dots
+        const dots = this.dotsEl.querySelectorAll('.carousel-dot');
+        dots.forEach((dot, index) => {
+            const isActive = index === this.currentSlide;
+            dot.classList.toggle('active', isActive);
+            dot.setAttribute('aria-selected', isActive.toString());
+        });
+        
+        // Update button states - remove disabled state for continuous loop
+        this.prevBtn.disabled = false;
+        this.nextBtn.disabled = false;
+    }
+
+    startAutoAdvance() {
+        if (this.slides.length <= 1) return;
+        
+        this.autoAdvanceInterval = setInterval(() => {
+            if (!this.isPaused) {
+                // Loop back to first slide when reaching the end
+                if (this.currentSlide === this.slides.length - 1) {
+                    this.goToSlide(0);
+                } else {
+                    this.nextSlide();
+                }
+            }
+        }, this.autoAdvanceDelay);
+    }
+
+    pauseAutoAdvance() {
+        this.isPaused = true;
+        this.containerEl.classList.add('paused');
+    }
+
+    resumeAutoAdvance() {
+        this.isPaused = false;
+        this.containerEl.classList.remove('paused');
+    }
+
+    restartAutoAdvance() {
+        clearInterval(this.autoAdvanceInterval);
+        this.resumeAutoAdvance();
+        this.startAutoAdvance();
+    }
+
+    destroy() {
+        clearInterval(this.autoAdvanceInterval);
+    }
+}
+
 class ReleaseManager {
     constructor() {
         this.apiUrl = 'https://api.github.com/repos/klp2/the-librarian-game/releases/latest';
@@ -236,6 +450,10 @@ function setupSmoothScrolling() {
 // Initialize when page loads
 document.addEventListener('DOMContentLoaded', async () => {
     setupSmoothScrolling();
+    
+    // Initialize changelog carousel
+    const changelogCarousel = new ChangelogCarousel();
+    changelogCarousel.init();
     
     const releaseManager = new ReleaseManager();
     await releaseManager.init();

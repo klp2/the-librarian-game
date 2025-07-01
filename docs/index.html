@@ -21,18 +21,19 @@
     </header>
 
     <main class="container">
-        <section class="testing-notice">
-            <h2>⚠️ Testing Phase</h2>
-            <div class="notice-content">
-                <p><strong>This is an early testing version of The Librarian.</strong></p>
-                <p>What to expect:</p>
-                <ul>
-                    <li>Bugs and balance issues</li>
-                    <li>Incomplete systems and placeholder content</li>
-                    <li>Frequent updates based on feedback</li>
-                </ul>
-                <p><strong>Current Test Goal:</strong> Kill all monsters on all 10 dungeon levels to achieve victory!</p>
-                <p>Your feedback is invaluable. Please report issues on our <a href="https://github.com/klp2/the-librarian-game/issues">GitHub page</a>.</p>
+        <section class="changelog-carousel" aria-label="Latest game updates">
+            <h2>🚀 Latest Updates</h2>
+            <div class="carousel-container" role="region" aria-label="Changelog carousel">
+                <div class="carousel-track" id="carousel-track" role="group" aria-live="polite">
+                    <!-- Changelog items will be inserted here by JavaScript -->
+                </div>
+                <div class="carousel-controls" role="group" aria-label="Carousel navigation">
+                    <button class="carousel-btn prev" id="prev-btn" aria-label="Previous changelog">❮</button>
+                    <div class="carousel-dots" id="carousel-dots" role="tablist" aria-label="Changelog slides">
+                        <!-- Dots will be inserted here by JavaScript -->
+                    </div>
+                    <button class="carousel-btn next" id="next-btn" aria-label="Next changelog">❯</button>
+                </div>
             </div>
         </section>
 
@@ -55,6 +56,11 @@
         <section class="features-section">
             <h2>Game Features</h2>
             <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">🎨</div>
+                    <h3>Enhanced Graphics</h3>
+                    <p>Rich ASCII colors with runtime toggle. Enhanced visual experience with automatic terminal compatibility.</p>
+                </div>
                 <div class="feature-card">
                     <div class="feature-icon">🗺️</div>
                     <h3>Procedural Dungeons</h3>
@@ -125,6 +131,7 @@
                     <ul>
                         <li><kbd>s</kbd> - View skills</li>
                         <li><kbd>b</kbd> - Special abilities</li>
+                        <li><kbd>g</kbd> - Toggle graphics mode (debug)</li>
                         <li><kbd>q</kbd> or <kbd>Escape</kbd> - Quit</li>
                         <li><kbd>Enter</kbd> - Confirm selections</li>
                     </ul>
@@ -140,6 +147,7 @@
                     <ul>
                         <li>Windows 10 or later</li>
                         <li>Terminal with Unicode support</li>
+                        <li>Color terminal for enhanced graphics</li>
                         <li>50MB RAM, 10MB storage</li>
                     </ul>
                 </div>
@@ -148,6 +156,7 @@
                     <ul>
                         <li>macOS 10.14 or later</li>
                         <li>Terminal.app or iTerm2</li>
+                        <li>True color support recommended</li>
                         <li>Intel or Apple Silicon</li>
                     </ul>
                 </div>
@@ -155,7 +164,7 @@
                     <h3>🐧 Linux</h3>
                     <ul>
                         <li>Any modern distribution</li>
-                        <li>Terminal emulator</li>
+                        <li>Terminal emulator with 256-color support</li>
                         <li>80x24 minimum terminal size</li>
                     </ul>
                 </div>
