@@ -3,6 +3,17 @@
 // Changelog Carousel Data
 const changelogData = [
     {
+        version: "v0.5.2",
+        title: "Lore Display Bug Fix",
+        highlights: [
+            "Fixed critical bug where item lore was generated but never displayed",
+            "Players can now see rich narrative content from equipment usage",
+            "Added comprehensive test coverage with 6 new test scenarios",
+            "Zero breaking changes with full backward compatibility"
+        ],
+        cta: "Discover the stories your items tell!"
+    },
+    {
         version: "v0.5.1",
         title: "Critical Win Condition Fix",
         highlights: [

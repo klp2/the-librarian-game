@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.2] - 2025-07-02
+
+### Fixed
+- **Item Lore Display Bug (Issue #32)**: Items now properly display accumulated lore content
+  - Fixed critical bug where lore fragments and generated stories were created but never shown to players
+  - Root cause: `formatItemDetails()` function was missing display logic for lore content
+  - Solution: Added display functionality for both LoreFragments and GeneratedStories arrays
+  - Players can now see rich narrative content that emerges from equipment usage
+  - Comprehensive test coverage with 6 new test scenarios covering all lore display cases
+  - Zero breaking changes - maintains full backward compatibility
+
+### Technical Details
+- **Testing**: Added 136 lines of comprehensive test code with custom string matching helpers
+- **Performance**: Minimal impact - string concatenation only occurs during user-initiated examine actions
+- **Architecture**: Clean integration with existing `formatItemDetails()` function
+- **Development Process**: Utilized multi-agent planning (5 agents) and code review (4 agents) workflow
+
 ## [0.5.1] - 2025-07-01
 
 ### Fixed
