@@ -1,0 +1,312 @@
+# Cross-Repository Release Sync Workflow
+# This workflow should be placed in the PRIVATE repository (.github/workflows/sync-release.yml)
+# It automatically syncs releases from private repo to public repo
+
+name: Sync Release to Public Repository
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Tag name to sync (leave empty for latest)'
+        required: false
+        type: string
+      force_sync:
+        description: 'Force sync even if release exists in public repo'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  sync-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+      - name: Validate inputs and environment
+        run: |
+          if [ -z "${{ secrets.CROSS_REPO_TOKEN }}" ]; then
+            echo "❌ CROSS_REPO_TOKEN secret not configured"
+            exit 1
+          fi
+          
+          if [ -z "${{ secrets.PUBLIC_REPO_OWNER }}" ] || [ -z "${{ secrets.PUBLIC_REPO_NAME }}" ]; then
+            echo "❌ PUBLIC_REPO_OWNER and PUBLIC_REPO_NAME secrets must be configured"
+            exit 1
+          fi
+          
+          echo "✅ Environment validation passed"
+
+      - name: Checkout private repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Determine release tag and get information
+        id: release_info
+        run: |
+          # Determine which tag to sync
+          if [ -n "${{ github.event.inputs.tag_name }}" ]; then
+            TAG_NAME="${{ github.event.inputs.tag_name }}"
+            echo "🔄 Manual sync requested for tag: ${TAG_NAME}"
+          else
+            TAG_NAME="${{ github.event.release.tag_name }}"
+            echo "🚀 Auto-sync triggered for new release: ${TAG_NAME}"
+          fi
+          
+          if [ -z "${TAG_NAME}" ]; then
+            echo "❌ No tag name provided"
+            exit 1
+          fi
+          
+          echo "tag_name=${TAG_NAME}" >> $GITHUB_OUTPUT
+          
+          # Get release details from GitHub API
+          echo "📋 Fetching release information for ${TAG_NAME}..."
+          RELEASE_DATA=$(gh api repos/${{ github.repository }}/releases/tags/${TAG_NAME} 2>/dev/null || echo "null")
+          
+          if [ "${RELEASE_DATA}" = "null" ]; then
+            echo "❌ Release ${TAG_NAME} not found in private repository"
+            exit 1
+          fi
+          
+          # Extract release information
+          RELEASE_NAME=$(echo "${RELEASE_DATA}" | jq -r '.name // empty')
+          RELEASE_BODY=$(echo "${RELEASE_DATA}" | jq -r '.body // empty')
+          IS_PRERELEASE=$(echo "${RELEASE_DATA}" | jq -r '.prerelease // false')
+          IS_DRAFT=$(echo "${RELEASE_DATA}" | jq -r '.draft // false')
+          ASSET_COUNT=$(echo "${RELEASE_DATA}" | jq -r '.assets | length')
+          
+          echo "release_name=${RELEASE_NAME}" >> $GITHUB_OUTPUT
+          echo "is_prerelease=${IS_PRERELEASE}" >> $GITHUB_OUTPUT
+          echo "is_draft=${IS_DRAFT}" >> $GITHUB_OUTPUT
+          echo "asset_count=${ASSET_COUNT}" >> $GITHUB_OUTPUT
+          
+          # Handle multiline release body
+          echo "release_body<<EOF" >> $GITHUB_OUTPUT
+          echo "${RELEASE_BODY}" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          
+          echo "📊 Release info: name='${RELEASE_NAME}', assets=${ASSET_COUNT}, prerelease=${IS_PRERELEASE}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check if release exists in public repository
+        id: check_public
+        run: |
+          PUBLIC_REPO="${{ secrets.PUBLIC_REPO_OWNER }}/${{ secrets.PUBLIC_REPO_NAME }}"
+          TAG_NAME="${{ steps.release_info.outputs.tag_name }}"
+          
+          echo "🔍 Checking if release ${TAG_NAME} exists in ${PUBLIC_REPO}..."
+          
+          PUBLIC_RELEASE=$(gh api repos/${PUBLIC_REPO}/releases/tags/${TAG_NAME} 2>/dev/null || echo "null")
+          
+          if [ "${PUBLIC_RELEASE}" != "null" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "⚠️ Release ${TAG_NAME} already exists in public repository"
+            
+            if [ "${{ github.event.inputs.force_sync }}" != "true" ]; then
+              echo "❌ Release exists and force_sync not enabled. Exiting."
+              exit 1
+            else
+              echo "🔄 Force sync enabled, will overwrite existing release"
+            fi
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "✅ Release ${TAG_NAME} does not exist in public repository"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.CROSS_REPO_TOKEN }}
+
+      - name: Download release assets from private repository
+        run: |
+          TAG_NAME="${{ steps.release_info.outputs.tag_name }}"
+          ASSET_COUNT="${{ steps.release_info.outputs.asset_count }}"
+          
+          if [ "${ASSET_COUNT}" = "0" ]; then
+            echo "ℹ️ No assets to download for release ${TAG_NAME}"
+            mkdir -p release-assets
+            touch release-assets/.gitkeep
+          else
+            echo "📥 Downloading ${ASSET_COUNT} assets for release ${TAG_NAME}..."
+            mkdir -p release-assets
+            
+            gh release download ${TAG_NAME} \
+              --dir release-assets \
+              --repo ${{ github.repository }}
+            
+            echo "✅ Downloaded assets:"
+            ls -la release-assets/
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prepare public repository content
+        run: |
+          echo "📦 Preparing content for public repository..."
+          mkdir -p public-content
+          
+          # Copy all downloaded assets
+          if [ -d release-assets ] && [ "$(ls -A release-assets 2>/dev/null)" ]; then
+            cp -r release-assets/* public-content/ 2>/dev/null || true
+          fi
+          
+          # Create release notes file
+          cat > public-content/RELEASE_NOTES.md << 'EOF'
+          ${{ steps.release_info.outputs.release_body }}
+          EOF
+          
+          # Generate checksums for all binary files
+          cd public-content
+          if ls *.tar.gz *.zip 2>/dev/null; then
+            echo "🔐 Generating checksums..."
+            find . -type f \( -name "*.tar.gz" -o -name "*.zip" -o -name "*.exe" -o -name "*.dmg" \) \
+              -exec sha256sum {} + > checksums.txt || true
+            
+            if [ -f checksums.txt ] && [ -s checksums.txt ]; then
+              echo "✅ Checksums generated:"
+              cat checksums.txt
+            else
+              echo "ℹ️ No binary files found for checksum generation"
+            fi
+          else
+            echo "ℹ️ No archives found for checksum generation"
+          fi
+
+      - name: Delete existing public release if force sync
+        if: steps.check_public.outputs.exists == 'true' && github.event.inputs.force_sync == 'true'
+        run: |
+          PUBLIC_REPO="${{ secrets.PUBLIC_REPO_OWNER }}/${{ secrets.PUBLIC_REPO_NAME }}"
+          TAG_NAME="${{ steps.release_info.outputs.tag_name }}"
+          
+          echo "🗑️ Deleting existing release ${TAG_NAME} from ${PUBLIC_REPO}..."
+          gh release delete ${TAG_NAME} --repo ${PUBLIC_REPO} --yes
+          echo "✅ Existing release deleted"
+        env:
+          GH_TOKEN: ${{ secrets.CROSS_REPO_TOKEN }}
+
+      - name: Create release in public repository
+        run: |
+          PUBLIC_REPO="${{ secrets.PUBLIC_REPO_OWNER }}/${{ secrets.PUBLIC_REPO_NAME }}"
+          TAG_NAME="${{ steps.release_info.outputs.tag_name }}"
+          RELEASE_NAME="${{ steps.release_info.outputs.release_name }}"
+          
+          echo "🚀 Creating release ${TAG_NAME} in ${PUBLIC_REPO}..."
+          
+          # Prepare release command arguments
+          RELEASE_ARGS="--title \"${RELEASE_NAME:-${TAG_NAME}}\""
+          
+          if [ -f public-content/RELEASE_NOTES.md ]; then
+            RELEASE_ARGS="${RELEASE_ARGS} --notes-file public-content/RELEASE_NOTES.md"
+          else
+            RELEASE_ARGS="${RELEASE_ARGS} --notes \"Release ${TAG_NAME}\""
+          fi
+          
+          if [ "${{ steps.release_info.outputs.is_prerelease }}" = "true" ]; then
+            RELEASE_ARGS="${RELEASE_ARGS} --prerelease"
+          fi
+          
+          if [ "${{ steps.release_info.outputs.is_draft }}" = "true" ]; then
+            RELEASE_ARGS="${RELEASE_ARGS} --draft"
+          fi
+          
+          # Create the release
+          if [ -d public-content ] && [ "$(find public-content -type f ! -name "RELEASE_NOTES.md" | wc -l)" -gt 0 ]; then
+            # Create release with assets
+            eval "gh release create ${TAG_NAME} ${RELEASE_ARGS} --repo ${PUBLIC_REPO} public-content/*"
+          else
+            # Create release without assets
+            eval "gh release create ${TAG_NAME} ${RELEASE_ARGS} --repo ${PUBLIC_REPO}"
+          fi
+          
+          echo "✅ Release ${TAG_NAME} created successfully in ${PUBLIC_REPO}"
+        env:
+          GH_TOKEN: ${{ secrets.CROSS_REPO_TOKEN }}
+
+      - name: Verify synchronization
+        run: |
+          PUBLIC_REPO="${{ secrets.PUBLIC_REPO_OWNER }}/${{ secrets.PUBLIC_REPO_NAME }}"
+          TAG_NAME="${{ steps.release_info.outputs.tag_name }}"
+          
+          echo "🔍 Verifying synchronization..."
+          
+          # Get public release info
+          PUBLIC_RELEASE=$(gh api repos/${PUBLIC_REPO}/releases/tags/${TAG_NAME})
+          PUBLIC_ASSET_COUNT=$(echo "${PUBLIC_RELEASE}" | jq -r '.assets | length')
+          
+          echo "✅ Verification results:"
+          echo "   - Tag: ${TAG_NAME}"
+          echo "   - Public repository: ${PUBLIC_REPO}"
+          echo "   - Assets in private repo: ${{ steps.release_info.outputs.asset_count }}"
+          echo "   - Assets in public repo: ${PUBLIC_ASSET_COUNT}"
+          echo "   - Public release URL: $(echo "${PUBLIC_RELEASE}" | jq -r '.html_url')"
+          
+          # Optional: Compare asset counts (allowing for additional files like checksums)
+          PRIVATE_COUNT="${{ steps.release_info.outputs.asset_count }}"
+          if [ "${PRIVATE_COUNT}" -gt 0 ] && [ "${PUBLIC_ASSET_COUNT}" -lt "${PRIVATE_COUNT}" ]; then
+            echo "⚠️ Warning: Public repository has fewer assets than private repository"
+            echo "   This might indicate an upload failure"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.CROSS_REPO_TOKEN }}
+
+      - name: Update public repository metadata
+        run: |
+          PUBLIC_REPO="${{ secrets.PUBLIC_REPO_OWNER }}/${{ secrets.PUBLIC_REPO_NAME }}"
+          TAG_NAME="${{ steps.release_info.outputs.tag_name }}"
+          
+          echo "📝 Updating public repository metadata..."
+          
+          # Clone public repository for updates
+          git clone https://x-access-token:${{ secrets.CROSS_REPO_TOKEN }}@github.com/${PUBLIC_REPO}.git public-repo-clone
+          cd public-repo-clone
+          
+          # Configure git
+          git config user.name "Release Automation"
+          git config user.email "noreply@github.com"
+          
+          # Update README with current version if pattern exists
+          if [ -f README.md ] && grep -q "Current Version" README.md; then
+            sed -i "s/\*\*Current Version\*\*:.*/\*\*Current Version\*\*: ${TAG_NAME}/" README.md
+            echo "✅ Updated version in README.md"
+          fi
+          
+          # Copy release artifacts to repository if directory exists
+          if [ -d release-artifacts ] && [ -d ../public-content ]; then
+            rm -rf release-artifacts/*
+            cp -r ../public-content/* release-artifacts/ 2>/dev/null || true
+            echo "✅ Updated release-artifacts directory"
+          fi
+          
+          # Commit changes if any
+          if git diff --quiet && git diff --cached --quiet; then
+            echo "ℹ️ No metadata changes to commit"
+          else
+            git add .
+            git commit -m "sync: update metadata for release ${TAG_NAME}"
+            git push origin main
+            echo "✅ Metadata changes committed and pushed"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.CROSS_REPO_TOKEN }}
+
+      - name: Summary
+        run: |
+          echo "🎉 Release synchronization completed successfully!"
+          echo ""
+          echo "📋 Summary:"
+          echo "   - Private repository: ${{ github.repository }}"
+          echo "   - Public repository: ${{ secrets.PUBLIC_REPO_OWNER }}/${{ secrets.PUBLIC_REPO_NAME }}"
+          echo "   - Synced release: ${{ steps.release_info.outputs.tag_name }}"
+          echo "   - Release name: ${{ steps.release_info.outputs.release_name }}"
+          echo "   - Assets synced: ${{ steps.release_info.outputs.asset_count }}"
+          echo "   - Is prerelease: ${{ steps.release_info.outputs.is_prerelease }}"
+          echo ""
+          echo "🔗 View the public release:"
+          echo "   https://github.com/${{ secrets.PUBLIC_REPO_OWNER }}/${{ secrets.PUBLIC_REPO_NAME }}/releases/tag/${{ steps.release_info.outputs.tag_name }}"

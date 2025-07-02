@@ -1,0 +1,326 @@
+name: Validate Release Synchronization
+
+on:
+  schedule:
+    # Check every 6 hours
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+    inputs:
+      private_repo:
+        description: 'Private repository to compare against'
+        required: false
+        default: 'klp2/the-librarian'
+        type: string
+      notification_level:
+        description: 'Level of notifications to send'
+        required: false
+        default: 'errors-only'
+        type: choice
+        options:
+          - 'all'
+          - 'errors-only'
+          - 'silent'
+
+permissions:
+  contents: read
+  issues: write  # For creating issues when sync problems are detected
+
+env:
+  PRIVATE_REPO: ${{ github.event.inputs.private_repo || 'klp2/the-librarian' }}
+  PUBLIC_REPO: ${{ github.repository }}
+
+jobs:
+  validate-sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+      - name: Setup validation environment
+        run: |
+          echo "🔍 Validation Configuration:"
+          echo "  Private repository: $PRIVATE_REPO"
+          echo "  Public repository:  $PUBLIC_REPO"
+          echo "  Notification level: ${{ github.event.inputs.notification_level || 'errors-only' }}"
+          echo "  Triggered by: ${{ github.event_name }}"
+
+      - name: Get private repository releases
+        id: private_releases
+        run: |
+          echo "📋 Fetching releases from private repository..."
+          
+          # Get all releases from private repo
+          PRIVATE_RELEASES=$(gh api repos/$PRIVATE_REPO/releases --paginate --jq '[.[] | {tag_name, name, published_at, prerelease, draft, assets: (.assets | length)}]')
+          
+          # Count total releases
+          PRIVATE_COUNT=$(echo "$PRIVATE_RELEASES" | jq length)
+          
+          # Get latest release info
+          LATEST_PRIVATE=$(echo "$PRIVATE_RELEASES" | jq -r '.[0] | .tag_name // "none"')
+          
+          echo "private_count=$PRIVATE_COUNT" >> $GITHUB_OUTPUT
+          echo "latest_private=$LATEST_PRIVATE" >> $GITHUB_OUTPUT
+          
+          # Save releases data for comparison
+          echo "$PRIVATE_RELEASES" > private_releases.json
+          
+          echo "✅ Found $PRIVATE_COUNT releases in private repository"
+          echo "   Latest: $LATEST_PRIVATE"
+        env:
+          GH_TOKEN: ${{ secrets.CROSS_REPO_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Get public repository releases
+        id: public_releases
+        run: |
+          echo "📋 Fetching releases from public repository..."
+          
+          # Get all releases from public repo
+          PUBLIC_RELEASES=$(gh api repos/$PUBLIC_REPO/releases --paginate --jq '[.[] | {tag_name, name, published_at, prerelease, draft, assets: (.assets | length)}]')
+          
+          # Count total releases
+          PUBLIC_COUNT=$(echo "$PUBLIC_RELEASES" | jq length)
+          
+          # Get latest release info
+          LATEST_PUBLIC=$(echo "$PUBLIC_RELEASES" | jq -r '.[0] | .tag_name // "none"')
+          
+          echo "public_count=$PUBLIC_COUNT" >> $GITHUB_OUTPUT
+          echo "latest_public=$LATEST_PUBLIC" >> $GITHUB_OUTPUT
+          
+          # Save releases data for comparison
+          echo "$PUBLIC_RELEASES" > public_releases.json
+          
+          echo "✅ Found $PUBLIC_COUNT releases in public repository"
+          echo "   Latest: $LATEST_PUBLIC"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compare release counts and identify issues
+        id: comparison
+        run: |
+          PRIVATE_COUNT="${{ steps.private_releases.outputs.private_count }}"
+          PUBLIC_COUNT="${{ steps.public_releases.outputs.public_count }}"
+          LATEST_PRIVATE="${{ steps.private_releases.outputs.latest_private }}"
+          LATEST_PUBLIC="${{ steps.public_releases.outputs.latest_public }}"
+          
+          echo "📊 Comparison Results:"
+          echo "  Private releases: $PRIVATE_COUNT"
+          echo "  Public releases:  $PUBLIC_COUNT"
+          echo "  Latest private:   $LATEST_PRIVATE"
+          echo "  Latest public:    $LATEST_PUBLIC"
+          
+          # Initialize issue tracking
+          ISSUES_FOUND="false"
+          ISSUE_DETAILS=""
+          SYNC_STATUS="healthy"
+          
+          # Check release count discrepancy
+          if [ "$PRIVATE_COUNT" -ne "$PUBLIC_COUNT" ]; then
+            ISSUES_FOUND="true"
+            SYNC_STATUS="count-mismatch"
+            ISSUE_DETAILS="${ISSUE_DETAILS}• Release count mismatch: Private=$PRIVATE_COUNT, Public=$PUBLIC_COUNT\n"
+            echo "⚠️ Release count mismatch detected"
+          fi
+          
+          # Check latest release alignment
+          if [ "$LATEST_PRIVATE" != "$LATEST_PUBLIC" ] && [ "$LATEST_PRIVATE" != "none" ]; then
+            ISSUES_FOUND="true"
+            if [ "$SYNC_STATUS" = "healthy" ]; then
+              SYNC_STATUS="latest-mismatch"
+            fi
+            ISSUE_DETAILS="${ISSUE_DETAILS}• Latest release mismatch: Private=$LATEST_PRIVATE, Public=$LATEST_PUBLIC\n"
+            echo "⚠️ Latest release mismatch detected"
+          fi
+          
+          # Find missing releases
+          echo "🔍 Identifying missing releases..."
+          MISSING_RELEASES=$(jq -r --slurpfile public public_releases.json '
+            .[] | select(.tag_name as $tag | $public[0] | map(.tag_name) | index($tag) | not) | .tag_name
+          ' private_releases.json | tr '\n' ',' | sed 's/,$//')
+          
+          if [ -n "$MISSING_RELEASES" ]; then
+            ISSUES_FOUND="true"
+            if [ "$SYNC_STATUS" = "healthy" ]; then
+              SYNC_STATUS="missing-releases"
+            fi
+            ISSUE_DETAILS="${ISSUE_DETAILS}• Missing releases in public repo: $MISSING_RELEASES\n"
+            echo "⚠️ Missing releases: $MISSING_RELEASES"
+          fi
+          
+          # Check asset count mismatches for matching releases
+          echo "🔍 Checking asset counts for matching releases..."
+          ASSET_MISMATCHES=$(jq -r --slurpfile public public_releases.json '
+            .[] as $private | $public[0][] | 
+            select(.tag_name == $private.tag_name and .assets != $private.assets) |
+            "\(.tag_name): private=\($private.assets), public=\(.assets)"
+          ' private_releases.json)
+          
+          if [ -n "$ASSET_MISMATCHES" ]; then
+            echo "⚠️ Asset count mismatches found:"
+            echo "$ASSET_MISMATCHES"
+            ISSUE_DETAILS="${ISSUE_DETAILS}• Asset count mismatches:\n$(echo "$ASSET_MISMATCHES" | sed 's/^/  - /')\n"
+          fi
+          
+          # Set outputs
+          echo "issues_found=$ISSUES_FOUND" >> $GITHUB_OUTPUT
+          echo "sync_status=$SYNC_STATUS" >> $GITHUB_OUTPUT
+          echo "missing_releases=$MISSING_RELEASES" >> $GITHUB_OUTPUT
+          
+          # Save issue details for later use
+          echo -e "$ISSUE_DETAILS" > issue_details.txt
+          
+          if [ "$ISSUES_FOUND" = "true" ]; then
+            echo "❌ Synchronization issues detected"
+          else
+            echo "✅ Release synchronization is healthy"
+          fi
+
+      - name: Generate detailed sync report
+        if: steps.comparison.outputs.issues_found == 'true' || github.event.inputs.notification_level == 'all'
+        run: |
+          echo "📋 Generating detailed sync report..."
+          
+          cat > sync_report.md << 'EOF'
+          # Release Synchronization Report
+          
+          **Generated**: $(date -u '+%Y-%m-%d %H:%M:%S UTC')  
+          **Private Repository**: ${{ env.PRIVATE_REPO }}  
+          **Public Repository**: ${{ env.PUBLIC_REPO }}  
+          **Status**: ${{ steps.comparison.outputs.sync_status }}
+          
+          ## Summary
+          
+          - **Private Releases**: ${{ steps.private_releases.outputs.private_count }}
+          - **Public Releases**: ${{ steps.public_releases.outputs.public_count }}
+          - **Latest Private**: ${{ steps.private_releases.outputs.latest_private }}
+          - **Latest Public**: ${{ steps.public_releases.outputs.latest_public }}
+          
+          ## Issues Detected
+          
+          EOF
+          
+          if [ "${{ steps.comparison.outputs.issues_found }}" = "true" ]; then
+            cat issue_details.txt >> sync_report.md
+            
+            cat >> sync_report.md << 'EOF'
+            
+            ## Recommended Actions
+            
+            1. **Check automation status**: Verify that the cross-repository sync workflow is enabled and functioning
+            2. **Review recent releases**: Ensure all intended releases have been published in the private repository
+            3. **Manual sync**: Consider running the emergency sync script for missing releases:
+               ```bash
+               ./scripts/emergency-sync.sh <MISSING_TAG>
+               ```
+            4. **Investigate permissions**: Verify that the `CROSS_REPO_TOKEN` has appropriate permissions
+            
+            ## Automatic Resolution
+            
+            If this is a temporary issue, the next scheduled release or manual workflow trigger should resolve it.
+            For persistent issues, check the [Release Automation Guide](./RELEASE_AUTOMATION_GUIDE.md).
+            EOF
+          else
+            echo "No issues detected. All releases are properly synchronized." >> sync_report.md
+          fi
+          
+          cat >> sync_report.md << 'EOF'
+          
+          ## Detailed Release Comparison
+          
+          ### Private Repository Releases
+          ```json
+          EOF
+          cat private_releases.json | jq '.' >> sync_report.md
+          cat >> sync_report.md << 'EOF'
+          ```
+          
+          ### Public Repository Releases
+          ```json
+          EOF
+          cat public_releases.json | jq '.' >> sync_report.md
+          echo '```' >> sync_report.md
+
+      - name: Create or update sync status issue
+        if: steps.comparison.outputs.issues_found == 'true'
+        run: |
+          echo "🐛 Creating/updating issue for sync problems..."
+          
+          ISSUE_TITLE="🔄 Release Synchronization Issue Detected"
+          ISSUE_LABEL="sync-issue,automation"
+          
+          # Check if there's already an open issue for sync problems
+          EXISTING_ISSUE=$(gh issue list \
+            --repo "$PUBLIC_REPO" \
+            --label "$ISSUE_LABEL" \
+            --state open \
+            --json number,title \
+            --jq '.[0].number // empty')
+          
+          if [ -n "$EXISTING_ISSUE" ]; then
+            echo "📝 Updating existing issue #$EXISTING_ISSUE"
+            gh issue comment "$EXISTING_ISSUE" \
+              --repo "$PUBLIC_REPO" \
+              --body-file sync_report.md
+          else
+            echo "📝 Creating new sync issue"
+            gh issue create \
+              --repo "$PUBLIC_REPO" \
+              --title "$ISSUE_TITLE" \
+              --label "$ISSUE_LABEL" \
+              --body-file sync_report.md
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Close resolved sync issues
+        if: steps.comparison.outputs.issues_found == 'false'
+        run: |
+          echo "✅ Checking for resolved sync issues to close..."
+          
+          ISSUE_LABEL="sync-issue,automation"
+          
+          # Find open sync issues
+          OPEN_ISSUES=$(gh issue list \
+            --repo "$PUBLIC_REPO" \
+            --label "$ISSUE_LABEL" \
+            --state open \
+            --json number \
+            --jq '.[].number')
+          
+          if [ -n "$OPEN_ISSUES" ]; then
+            echo "🔒 Closing resolved sync issues..."
+            for issue in $OPEN_ISSUES; do
+              echo "  Closing issue #$issue"
+              gh issue close "$issue" \
+                --repo "$PUBLIC_REPO" \
+                --comment "✅ Release synchronization has been restored. All releases are now properly synchronized between repositories."
+            done
+          else
+            echo "ℹ️ No open sync issues to close"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Send notification summary
+        if: github.event.inputs.notification_level == 'all' || (github.event.inputs.notification_level != 'silent' && steps.comparison.outputs.issues_found == 'true')
+        run: |
+          echo "📢 Sync Validation Summary:"
+          echo ""
+          echo "**Status**: ${{ steps.comparison.outputs.sync_status }}"
+          echo "**Issues Found**: ${{ steps.comparison.outputs.issues_found }}"
+          echo "**Private Releases**: ${{ steps.private_releases.outputs.private_count }}"
+          echo "**Public Releases**: ${{ steps.public_releases.outputs.public_count }}"
+          
+          if [ "${{ steps.comparison.outputs.missing_releases }}" != "" ]; then
+            echo "**Missing Releases**: ${{ steps.comparison.outputs.missing_releases }}"
+          fi
+          
+          echo ""
+          echo "For detailed information, check the workflow logs or any created issues."
+
+      - name: Set workflow conclusion
+        run: |
+          if [ "${{ steps.comparison.outputs.issues_found }}" = "true" ]; then
+            echo "::warning::Release synchronization issues detected. Check the logs and any created issues for details."
+            exit 1
+          else
+            echo "✅ Release synchronization validation completed successfully"
+          fi
