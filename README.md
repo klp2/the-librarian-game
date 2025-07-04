@@ -132,7 +132,7 @@ For optimal color experience:
 
 ## Release Information
 
-**Current Version**: v0.5.1 (Graphics System Implementation)
+**Current Version**: v0.5.3 (Windows Console Compatibility & Security Fixes)
 **License**: Proprietary - All Rights Reserved
 **Platforms**: Linux, macOS, Windows (x86_64 and ARM64)
 

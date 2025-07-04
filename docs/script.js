@@ -3,6 +3,17 @@
 // Changelog Carousel Data
 const changelogData = [
     {
+        version: "v0.5.3",
+        title: "Windows Console Compatibility & Security Fixes",
+        highlights: [
+            "Complete Windows console support with proper color mapping",
+            "Fixed security vulnerability - removed accidentally exposed tokens",
+            "Enhanced Windows Terminal, cmd.exe, and PowerShell compatibility",
+            "LRU cache implementation for improved graphics performance"
+        ],
+        cta: "Experience seamless Windows gameplay!"
+    },
+    {
         version: "v0.5.2",
         title: "Lore Display Bug Fix",
         highlights: [
@@ -227,7 +238,7 @@ class ChangelogCarousel {
 
 class ReleaseManager {
     constructor() {
-        this.baseDownloadUrl = 'https://github.com/klp2/the-librarian-game/raw/main/downloads/v0.5.1/';
+        this.baseDownloadUrl = 'https://github.com/klp2/the-librarian-game/raw/main/downloads/v0.5.3/';
         this.loadingEl = document.getElementById('loading');
         this.errorEl = document.getElementById('error');
         this.downloadsEl = document.getElementById('downloads');
@@ -235,10 +246,10 @@ class ReleaseManager {
         this.platformDownloadsEl = document.getElementById('platform-downloads');
         this.additionalFilesEl = document.getElementById('additional-files');
         
-        // Static release data for v0.5.1
+        // Static release data for v0.5.3
         this.releaseData = {
-            tag_name: 'v0.5.1',
-            published_at: '2025-01-02T00:00:00Z',
+            tag_name: 'v0.5.3',
+            published_at: '2025-07-04T00:00:00Z',
             prerelease: false,
             assets: [
                 {
